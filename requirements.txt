@@ -3,3 +3,4 @@ seaborn
 matplotlib
 pyarrow
 numpy
+scipy
