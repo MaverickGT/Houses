@@ -3,9 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
+import mlflow
+from mlflow.models.signature import infer_signature
+import mlflow.sklearn
 
 df = pd.read_csv('house.csv')
 
@@ -16,7 +19,7 @@ print("Data Frame Head: \n", df.head(), "\n")
 print("Data Frame Description: \n", df.describe(), "\n")
 
 
-#convert all values to numeric
+# Convert all values to numeric
 df['Brick'] = df['Brick'].map({'Yes': 1, 'No': 0})
 df['Neighborhood'] = df['Neighborhood'].map({'North': 1, 'South': 2, 'East': 3, 'West': 4})
 
@@ -24,7 +27,7 @@ df['Neighborhood'] = df['Neighborhood'].map({'North': 1, 'South': 2, 'East': 3, 
 # Handle missing values
 df.fillna(0, inplace=True)  # Replace missing values with 0
 
-#check for outliers and handle them
+# Check for outliers and handle them
 print(f'Number of rows before removing outliers: {len(df)}')
 for col in df.columns:
   if df[col].dtype != 'object':
@@ -35,13 +38,13 @@ for col in df.columns:
     df = df.drop(outliers.index)
 print(f'Number of rows after removing outliers: {len(df)}')
 
-#check for null values and handle them
+# Check for null values and handle them
 print(f"\nNumber of null values before handling: {df.isnull().values.sum()}")
 if df.isnull().values.any():
   df = df.fillna(df.median())
 print(f"\nNumber of null values after handling: {df.isnull().values.sum()}")
 
-#check for duplicate values and handle them
+# Check for duplicate values and handle them
 print(f"\nNumber of duplicate values before handling: {df.duplicated().sum()}")
 df = df.drop_duplicates()
 print(f"\nNumber of duplicate values after handling: {df.duplicated().sum()}")
@@ -64,15 +67,74 @@ plt.show()
 X = df.drop('Price', axis=1)
 y = df['Price']
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=44)
 
-model = LinearRegression()
+# # Selecting the best model
+# models = [('Linear Regresion', LinearRegression()),
+#           ('Gradient Boosting', GradientBoostingRegressor()),
+#           ('Random Forest', RandomForestRegressor())]
+
+
+# for model in models: #for loop through the three models
+#     reg = model[1]  #initialize the model object
+#     reg.fit(X_train,y_train)  #fitting the training data
+#     pred = reg.predict(X_test)  #predict target
+#     print(model[0])
+#     print('R2: ',r2_score(y_test, pred))  #check r2 score
+#     print('RMSE: ', np.sqrt(mean_squared_error(y_test, pred)))  #check root mean squared error
+#     print('-'*30)
+
+
+model = GradientBoostingRegressor()
 model.fit(X_train, y_train)
+
+print(model.get_params())
 
 y_pred = model.predict(X_test)
 
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
+# Calculate metrics
+accuracy = r2_score(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
-print("Mean Squared Error:", mse)
-print("R-squared:", r2)
+# Set our tracking server uri for logging
+mlflow.set_tracking_uri(uri="http://127.0.0.1:5000")
+
+# Create a new MLflow Experiment
+mlflow.set_experiment("MLflow Gradient Boosting Regression")
+
+
+# Start an MLflow experiment
+with mlflow.start_run():
+    
+    # Log the hyperparameters
+    mlflow.log_params(model.get_params())
+
+    # Log the loss metric
+    mlflow.log_metric("accuracy", accuracy)
+
+    # Set a tag that we can use to remind ourselves what this run was for
+    mlflow.set_tag("Training Info", "Basic Gradient Boosting Regression model for house.csv data")
+
+    # Infer the model signature
+    signature = infer_signature(X_train, model.predict(X_train))
+
+    # Log the model
+    model_info = mlflow.sklearn.log_model(
+      sk_model=model,
+      artifact_path="house_model",
+      signature=signature,
+      input_example=X_train,
+      registered_model_name="tracking-gbr-model",
+    )
+# Load the model back for predictions as a generic Python Function model
+loaded_model = mlflow.pyfunc.load_model(model_info.model_uri)
+
+predictions = loaded_model.predict(X_test)
+
+column_names = list(df.columns)
+
+result = pd.DataFrame(X_test, columns=column_names)
+result["actual"] = y_test
+result["predicted"] = predictions
+
+result[:4]

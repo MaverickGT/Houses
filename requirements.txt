@@ -4,3 +4,4 @@ matplotlib
 pyarrow
 numpy
 scipy
+mlflow
