@@ -74,7 +74,6 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_
 #           ('Gradient Boosting', GradientBoostingRegressor()),
 #           ('Random Forest', RandomForestRegressor())]
 
-
 # for model in models: #for loop through the three models
 #     reg = model[1]  #initialize the model object
 #     reg.fit(X_train,y_train)  #fitting the training data

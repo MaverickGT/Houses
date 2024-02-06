@@ -5,3 +5,4 @@ pyarrow
 numpy
 scipy
 mlflow
+setuptools
