@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import classification_report, mean_squared_error, r2_score
 import mlflow
 from mlflow.models.signature import infer_signature
 import mlflow.sklearn
@@ -67,6 +67,14 @@ plt.show()
 X = df.drop('Price', axis=1)
 y = df['Price']
 
+# EDA: Summary statistics and visualization
+eda_summary = X.describe()
+
+# Pairplot for visualizing relationships between features
+sns.set(style="ticks")
+eda_pairplot = sns.pairplot(data=eda_summary, diag_kind="kde")
+
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=44)
 
 # # Selecting the best model
@@ -105,11 +113,23 @@ mlflow.set_experiment("MLflow Gradient Boosting Regression")
 # Start an MLflow experiment
 with mlflow.start_run():
     
+    # Log EDA summary as a text artifact
+    eda_summary_file = "eda_summary.txt"
+    with open(eda_summary_file, "w") as eda_file:
+      eda_file.write(eda_summary.to_string())
+    mlflow.log_artifact(eda_summary_file)
+
+    # Log the EDA pairplot as an image artifact
+    pairplot_file = "eda_pairplot.png"
+    eda_pairplot.savefig(pairplot_file)
+    mlflow.log_artifact(pairplot_file)
+
     # Log the hyperparameters
     mlflow.log_params(model.get_params())
 
     # Log the loss metric
     mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_metric("mean squared error", rmse)
 
     # Set a tag that we can use to remind ourselves what this run was for
     mlflow.set_tag("Training Info", "Basic Gradient Boosting Regression model for house.csv data")
@@ -125,6 +145,7 @@ with mlflow.start_run():
       input_example=X_train,
       registered_model_name="tracking-gbr-model",
     )
+
 # Load the model back for predictions as a generic Python Function model
 loaded_model = mlflow.pyfunc.load_model(model_info.model_uri)
 
@@ -135,5 +156,8 @@ column_names = list(df.columns)
 result = pd.DataFrame(X_test, columns=column_names)
 result["actual"] = y_test
 result["predicted"] = predictions
-
+print(type(result))
+print(type(X_test))
+print(type(y_test))
 result[:4]
+print(result[:4])
